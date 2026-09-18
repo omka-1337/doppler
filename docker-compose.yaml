@@ -1,3 +1,7 @@
+# Pinned so the project name does not follow the directory: renaming the
+# folder would otherwise orphan the running containers into an old project.
+name: doppler
+
 services:
   bot:
     build: .

@@ -1,0 +1,120 @@
+#!/usr/bin/env sh
+# Doppler's control script.
+#
+#   ./doppler start | stop | restart | status | logs [service] | update
+#
+# Replaces the makefile it grew out of: make was never doing anything make is
+# for, and "./doppler start" reads better than "make start" for people who are
+# running a bot rather than building software.
+
+set -eu
+
+cd "$(dirname "$0")"
+
+# Compose ships as a docker subcommand now, but the standalone binary is still
+# what is installed on plenty of machines. Either is fine; pick whichever works.
+if docker compose version >/dev/null 2>&1; then
+    compose() { docker compose "$@"; }
+elif command -v docker-compose >/dev/null 2>&1; then
+    compose() { docker-compose "$@"; }
+else
+    echo "Neither 'docker compose' nor 'docker-compose' is available." >&2
+    echo "Install Docker Compose and try again." >&2
+    exit 1
+fi
+
+ensure_env() {
+    [ -f .env ] && return 0
+
+    if [ ! -f .env.example ]; then
+        echo "No .env and no .env.example to build one from." >&2
+        exit 1
+    fi
+
+    echo "No .env found. Creating one from .env.example..."
+    cp .env.example .env
+
+    # Lavalink needs a password and nobody should have to invent one.
+    if command -v openssl >/dev/null 2>&1; then
+        password=$(openssl rand -hex 16)
+    else
+        password=$(head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')
+    fi
+    sed -i "s/^LAVALINK_PASSWORD=.*/LAVALINK_PASSWORD=$password/" .env
+    echo "Generated .env with a random LAVALINK_PASSWORD."
+    echo
+    echo "Next: open http://localhost:8000 and finish setup there."
+    echo "The bot waits until it has a token, so start it first."
+    echo
+}
+
+usage() {
+    cat <<'USAGE'
+Usage: ./doppler <command>
+
+  start            bring the stack up
+  stop             take it down
+  restart          restart every service
+  status           what is running
+  logs [service]   follow the logs, optionally of one service
+  update           pull the latest release and rebuild
+
+Services: bot, web, broker
+USAGE
+}
+
+command=${1:-}
+[ $# -gt 0 ] && shift
+
+case "$command" in
+    start)
+        ensure_env
+        compose up -d
+        ;;
+    stop)
+        compose down
+        ;;
+    restart)
+        ensure_env
+        compose restart "$@"
+        ;;
+    status)
+        compose ps
+        ;;
+    logs)
+        compose logs -f "$@"
+        ;;
+    update)
+        ensure_env
+        compose stop
+        git fetch origin releases
+        # --ff-only rather than a plain pull: a deployment clone has no local
+        # commits to merge, so anything that cannot fast-forward means the
+        # published history moved and needs a deliberate reset, not a merge.
+        if ! git merge --ff-only FETCH_HEAD; then
+            cat <<'DIVERGED'
+
+Cannot fast-forward: this clone has diverged from origin/releases.
+Nothing here is meant to carry local commits, so the fix is:
+
+    git fetch origin && git reset --hard origin/releases
+
+Your .env, savedata/, secrets/ and installed plugins are gitignored
+and are not touched by that.
+
+DIVERGED
+            exit 1
+        fi
+        compose up -d --build --remove-orphans
+        docker image prune -f
+        ;;
+    ""|-h|--help|help)
+        usage
+        ;;
+    *)
+        echo "Unknown command: $command" >&2
+        echo >&2
+        usage >&2
+        exit 1
+        ;;
+esac

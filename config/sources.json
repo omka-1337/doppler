@@ -3,7 +3,7 @@
     {
       "name": "doppler-official",
       "label": "Doppler official plugins",
-      "repo": "omka-1337/Doppler-DiscordBot",
+      "repo": "omka-1337/doppler",
       "branch": "doppler/plugins",
       "trusted": true
     }
