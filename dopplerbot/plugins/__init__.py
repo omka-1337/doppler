@@ -6,6 +6,9 @@ Plugins import from :mod:`dopplerbot.plugins.api`; the bot uses
 
 from dopplerbot.plugins.api import (
     AIError,
+    EconomyAccess,
+    EconomyError,
+    InsufficientFunds,
     Plugin,
     PluginContext,
     PluginSetting,
@@ -27,6 +30,9 @@ from dopplerbot.plugins.manifest import (
 
 __all__ = [
     "AIError",
+    "EconomyAccess",
+    "EconomyError",
+    "InsufficientFunds",
     "EndpointError",
     "Plugin",
     "PluginContext",

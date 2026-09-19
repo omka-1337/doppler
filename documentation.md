@@ -4,7 +4,7 @@ Reference for writing a Doppler plugin. This file is the reference itself: a
 running dashboard renders it at `/docs/plugins`, with the API version that
 install actually implements shown in the header.
 
-**Plugin API 2.1**
+**Plugin API 2.2**
 
 - [Overview](#overview)
 - [Quick start](#quick-start)
@@ -47,7 +47,7 @@ A complete, working plugin.
     "id": "hello",
     "name": "Hello",
     "version": "1.0.0",
-    "api_version": "2.1",
+    "api_version": "2.2",
     "description": "Replies to /hello.",
     "author": "you",
     "icon": "👋"
@@ -113,7 +113,7 @@ without importing its Python.
 
 A plugin loads when its `api_version` has the **same major** as the API the bot
 implements and a **minor no newer** than it. Growing the API is therefore safe:
-a plugin written against 2.0 keeps loading on a bot implementing 2.1. Asking for
+a plugin written against 2.0 keeps loading on a bot implementing 2.2. Asking for
 more than the bot has is refused outright rather than failing halfway through,
 and a major bump refuses every plugin built for the previous one — which is what
 2.0 does to plugins written for 1.x.
@@ -229,6 +229,59 @@ Raises `AIError`.
 if await self.ctx.ai.is_configured():
     reply = await self.ctx.ai.complete("You are terse.", "Say hello.")
 ```
+
+### `ctx.economy`
+
+One wallet per member, shared by every plugin. Currency lives in the bot's
+database rather than a plugin's, because the point of it is to be shared: a shop
+and a game have to see one balance between them. Amounts are whole numbers.
+
+```python
+balance = await self.ctx.economy.balance(member)
+await self.ctx.economy.add(member, 100)
+
+try:
+    left = await self.ctx.economy.take(member, 250)
+except InsufficientFunds:
+    await interaction.response.send_message("You cannot afford that.")
+
+await self.ctx.economy.transfer(sender, recipient, 50)
+```
+
+`balance`, `add`, `take`, `transfer` and `set` all accept a member, a user, or a
+plain id. `take` and `transfer` raise `InsufficientFunds` rather than letting a
+balance go negative, and the check happens inside the write, so two plugins
+spending at the same moment cannot both succeed against the same coins.
+
+Bots have no wallets: passing one raises `EconomyError`. An id for an account
+the bot has never seen cannot be checked, and is allowed rather than guessed at.
+
+`set` overwrites a balance outright. It is there for putting a mistake right,
+not for gameplay.
+
+`top()` is the leaderboard. It returns `{"user_id": ..., "balance": ...}`,
+richest first, skipping wallets that hold nothing. Pass `limit=None` for the
+whole table if the plugin wants to rank things its own way. Ids rather than
+members, because resolving a member may need a request and which of them to
+show is the plugin's business.
+
+```python
+for place, row in enumerate(await self.ctx.economy.top(limit=10), start=1):
+    member = guild.get_member(row["user_id"])
+    ...
+```
+
+`currency()` returns what the operator calls the money, set once under
+**Settings → Main** and shared by every plugin so a shop and a game do not
+invent two different names for the same coins.
+
+```python
+money = await self.ctx.economy.currency()
+f"{money['symbol']} {balance} {money['name']}".strip()   # "🪙 250 coins"
+```
+
+`symbol` may be a plain emoji, a server one in Discord's `<:name:id>` form, or
+empty. `name` always has something in it, falling back to "coins".
 
 ### `ctx.services`
 

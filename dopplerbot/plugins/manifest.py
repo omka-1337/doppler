@@ -14,7 +14,7 @@ from pathlib import Path
 
 # Version of the plugin API this bot implements. A plugin declares the API
 # version it was written against; see is_api_compatible() for the rule.
-CURRENT_API_VERSION = "2.1"
+CURRENT_API_VERSION = "2.2"
 
 MANIFEST_FILENAME = "plugin.json"
 

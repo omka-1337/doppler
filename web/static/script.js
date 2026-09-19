@@ -6,6 +6,29 @@
 
 // ---------------------------------------------------------------------
 
+
+// A custom server emoji is pasted as <:name:id>, which is Discord's syntax and
+// means nothing to a browser. Its picture does have a URL though, so the field
+// shows it — otherwise there is no way to tell a correct paste from a typo
+// until the bot posts something.
+function previewCurrencySymbol() {
+    const field = document.getElementById('set_currency_symbol');
+    const preview = document.getElementById('currencySymbolPreview');
+    if (!field || !preview) return;
+
+    const custom = /^<(a?):([A-Za-z0-9_]+):(\d+)>$/.exec(field.value.trim());
+    if (!custom) {
+        preview.classList.add('hidden');
+        preview.removeAttribute('src');
+        return;
+    }
+
+    const [, animated, name, id] = custom;
+    preview.src = `https://cdn.discordapp.com/emojis/${id}.${animated ? 'gif' : 'png'}?size=32`;
+    preview.alt = name;
+    preview.classList.remove('hidden');
+}
+
 // Save settings via API
 async function saveSettings(event, category) {
     event.preventDefault();
@@ -215,6 +238,7 @@ function connectLogsWebSocket() {
 
 document.addEventListener('DOMContentLoaded', () => {
     loadSystemSettings();
+    previewCurrencySymbol();
     initStats();
     connectLogsWebSocket();
     loadPluginPages();

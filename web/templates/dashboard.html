@@ -281,6 +281,32 @@
                     <p class="text-[11px] text-gray-400 mt-1"> {{ t.settings.main_settings.description2 }} </p>
                 </div>
 
+                <!-- Currency: the symbol is narrow because it holds one emoji,
+                     the name takes the rest of the row. Plugins that deal in
+                     currency read both through ctx.economy. -->
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Currency</label>
+                    <div class="flex gap-2 items-start">
+                        <div class="flex items-center gap-2 shrink-0">
+                            <input type="text" name="currency_symbol" id="set_currency_symbol"
+                                value="{{ settings_main.get('currency_symbol', '') }}"
+                                placeholder="🪙" maxlength="64" autocomplete="off"
+                                oninput="previewCurrencySymbol()"
+                                class="w-20 text-center bg-[#1e1f22] border border-[#3f4147] rounded p-2 text-white focus:outline-none focus:border-indigo-500 transition">
+                            <img id="currencySymbolPreview" alt="" class="hidden w-6 h-6 rounded">
+                        </div>
+                        <input type="text" name="currency_name" id="set_currency_name"
+                            value="{{ settings_main.get('currency_name', '') }}"
+                            placeholder="coins" maxlength="32" autocomplete="off"
+                            class="flex-1 bg-[#1e1f22] border border-[#3f4147] rounded p-2 text-white focus:outline-none focus:border-indigo-500 transition">
+                    </div>
+                    <p class="text-[11px] text-gray-400 mt-1">
+                        A plain emoji, or a server one pasted as
+                        <code>&lt;:name:id&gt;</code> — the bot can use any emoji from a
+                        server it is in. The name is what plugins call the currency.
+                    </p>
+                </div>
+
                 <div class="pt-2">
                     <button type="submit"
                         class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-6 py-2 rounded transition shadow-md text-sm flex items-center gap-2">

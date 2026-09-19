@@ -27,6 +27,41 @@ much less often than the bot around it.
   then, so the dashboard can reach it while the token is still being entered,
   and a slow setup no longer fills the log directory with one file per attempt.
 
+## Unreleased
+
+### Added
+
+- Plugin API 2.2: `ctx.economy`, a wallet per member shared by every plugin.
+  `balance`, `add`, `take`, `transfer`, `top` and `set`, with the affordability check
+  inside the write so two plugins spending at once cannot overdraw. Bots have
+  no wallets. Plugins targeting an earlier 2.x keep loading unchanged.
+- A currency symbol and name under **Settings → Main**, read by plugins through
+  `ctx.economy.currency()`. A server emoji pasted as `<:name:id>` is previewed
+  in the field, since that syntax means nothing to a browser on its own.
+- `./doppler`, replacing the makefile: `start`, `stop`, `restart`, `status`,
+  `logs [service]`, `update`.
+- Issue forms for bug reports and feature requests, the bug form asking for the
+  diagnostics report.
+
+### Fixed
+
+- Enabling a plugin twice could crash it. A plugin whose setup waits on the
+  broker takes longer than the dashboard's timeout, so a second click started a
+  second load while the first was still running; both passed the "already
+  loaded?" check and the second died on `add_cog`. Loading, unloading and
+  reloading now take a lock per plugin.
+- A slow answer from the bot was reported as "Bot is not reachable", which sent
+  people looking in the wrong place. A timeout now says so.
+- The bot reported itself as connected before it had ever connected, because a
+  client that has not started is not "closed" either.
+
+### Changed
+
+- On a fresh install the bot waits for first-run setup instead of exiting and
+  being restarted every few seconds.
+- The compose project name is pinned, so renaming the directory no longer
+  orphans the running containers.
+
 ## 0.5.0 — 2026-09-11
 
 ### Changed

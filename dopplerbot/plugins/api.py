@@ -36,6 +36,7 @@ import discord
 import httpx
 
 from dopplerbot import ai as core_ai
+from dopplerbot import database as core_db
 from dopplerbot.ai import AIError  # re-exported for plugins
 from dopplerbot.database import SAVEDATA_DIR, get_settings, get_settings_by_category, set_settings
 from dopplerbot.plugins import endpoints as plugin_endpoints
@@ -299,6 +300,104 @@ class ServiceManager:
         return response.json()["stopped"]
 
 
+class EconomyError(Exception):
+    """Something went wrong with a wallet."""
+
+
+class InsufficientFunds(EconomyError):
+    """The member does not have that much to spend."""
+
+
+class EconomyAccess:
+    """A shared per-member wallet.
+
+    Currency lives in the bot's own database rather than a plugin's, because
+    the point of it is to be shared: a shop and a game have to see one balance
+    between them, not one each. Plugins never touch that table directly -- they
+    go through here, where the amounts are checked and the arithmetic is done
+    in a single statement so two plugins spending at once cannot overdraw.
+
+    Amounts are whole numbers. Currency in floating point is a bug in waiting.
+    """
+
+    def __init__(self, bot: "commands.Bot", log: logging.Logger):
+        self._bot = bot
+        self._log = log
+
+    def _user_id(self, member) -> int:
+        """Accepts a member, a user, or a plain id -- and refuses bots.
+
+        A bot cannot earn or be paid. Where the account is known this is
+        enforced; an id for someone the bot has never seen cannot be checked,
+        and is allowed rather than guessed at.
+        """
+        if isinstance(member, int):
+            known = self._bot.get_user(member)
+            if known is not None and known.bot:
+                raise EconomyError("Bots do not have wallets.")
+            return member
+
+        if getattr(member, "bot", False):
+            raise EconomyError("Bots do not have wallets.")
+
+        user_id = getattr(member, "id", None)
+        if user_id is None:
+            raise EconomyError(f"Cannot work out whose wallet {member!r} is.")
+        return int(user_id)
+
+    async def balance(self, member) -> int:
+        """What this member has. Someone with no wallet yet has nothing."""
+        return await core_db.get_balance(self._user_id(member))
+
+    async def add(self, member, amount: int) -> int:
+        """Credit a wallet. Returns the new balance."""
+        return await core_db.add_balance(self._user_id(member), amount)
+
+    async def take(self, member, amount: int) -> int:
+        """Debit a wallet. Raises InsufficientFunds rather than going negative."""
+        user_id = self._user_id(member)
+        remaining = await core_db.take_balance(user_id, amount)
+        if remaining is None:
+            held = await core_db.get_balance(user_id)
+            raise InsufficientFunds(f"Needed {int(amount)}, has {held}.")
+        return remaining
+
+    async def transfer(self, sender, recipient, amount: int) -> None:
+        """Move currency between two members, or do nothing at all."""
+        from_id = self._user_id(sender)
+        to_id = self._user_id(recipient)
+        if not await core_db.transfer_balance(from_id, to_id, amount):
+            held = await core_db.get_balance(from_id)
+            raise InsufficientFunds(f"Needed {int(amount)}, has {held}.")
+
+    async def set(self, member, amount: int) -> int:
+        """Overwrite a balance. For putting a mistake right, not for gameplay."""
+        return await core_db.set_balance(self._user_id(member), amount)
+
+    async def top(self, limit: int | None = 10, include_empty: bool = False) -> list[dict]:
+        """Wallets as ``{"user_id": ..., "balance": ...}``, richest first.
+
+        Pass ``limit=None`` for the whole table, which is what a plugin
+        building its own ranking wants. Ids rather than members: resolving a
+        member may need a request, and which of them you actually intend to
+        show is the plugin's business.
+        """
+        rows = await core_db.top_balances(limit, include_empty)
+        return [{"user_id": user_id, "balance": balance} for user_id, balance in rows]
+
+    async def currency(self) -> dict:
+        """What the operator calls the currency, and the emoji for it.
+
+        Set once under Settings -> Main and shared by every plugin, so a shop
+        and a game do not invent two different names for the same coins. The
+        symbol may be a plain emoji, a server one in Discord's ``<:name:id>``
+        form, or nothing at all; the name always has something in it.
+        """
+        symbol = await core_db.get_settings("currency_symbol", "", category="Main")
+        name = await core_db.get_settings("currency_name", "", category="Main")
+        return {"symbol": (symbol or "").strip(), "name": (name or "").strip() or "coins"}
+
+
 class AIAccess:
     """A plugin's route to text generation.
 
@@ -330,6 +429,7 @@ class PluginContext:
         self.settings = ScopedSettings(manifest.id, schema)
         self.services = ServiceManager(manifest, self.settings, self.log)
         self.ai = AIAccess(self.log)
+        self.economy = EconomyAccess(bot, self.log)
         self._db: PluginDatabase | None = None
         # Registrations tracked so unloading a plugin really removes it -- this
         # is what makes reloading a plugin without restarting the bot work.
