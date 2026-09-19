@@ -1,0 +1,10 @@
+# A blank issue skips every question above, and the answers are what make a
+# report actionable.
+blank_issues_enabled: false
+contact_links:
+  - name: Writing a plugin
+    url: https://github.com/omka-1337/doppler/blob/releases/documentation.md
+    about: The plugin API reference, including settings, pages and sidecar services.
+  - name: Running Doppler
+    url: https://github.com/omka-1337/doppler/blob/releases/README.md
+    about: Requirements, first run, configuration and the ./doppler script.

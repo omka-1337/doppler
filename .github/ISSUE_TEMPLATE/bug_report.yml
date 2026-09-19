@@ -1,0 +1,92 @@
+name: Bug report
+description: Something in Doppler does not work the way it should
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. The two fields that save the most
+        back-and-forth are **the diagnostics report** and **what you expected to
+        happen** — please do not skip them.
+
+  - type: input
+    id: version
+    attributes:
+      label: Doppler version
+      description: >-
+        Shown at the top of the dashboard, and reported by the `/bot-info`
+        command in Discord.
+      placeholder: "0.5.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where does it go wrong?
+      options:
+        - The bot, in Discord
+        - The web dashboard
+        - A plugin
+        - Installing or updating a plugin
+        - Starting the stack / containers
+        - First-run setup
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: plugin
+    attributes:
+      label: Which plugin, and which version?
+      description: Only if the problem is in a plugin. Its version is on the plugin's card.
+      placeholder: "Lavalink Music 2.4.0"
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did, and what Doppler did instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps, if you can get it to happen on purpose.
+      placeholder: |
+        1. Open the dashboard
+        2. ...
+        3. ...
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics report
+      description: >-
+        **Stats tab → Diagnostics** downloads one file with the versions, the
+        plugin state, the running containers and the current log. Drag it in
+        here, or paste the parts that matter.
+
+
+        Secret settings are replaced with their length, never their value. It
+        does still contain your server's channel and role ids and whatever your
+        log happens to mention, so have a look before attaching it.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I am on the latest release, or I have said above which version I am on
+          required: true
+        - label: I searched the existing issues and this is not one of them
+          required: true

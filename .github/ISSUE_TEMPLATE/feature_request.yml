@@ -1,0 +1,48 @@
+name: Feature request
+description: Suggest something Doppler should be able to do
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Doppler ships empty on purpose: most features belong in a plugin rather
+        than in the bot. If what you want is a feature rather than a change to
+        how plugins work, it is probably a plugin — say so below and it can be
+        discussed as one.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: >-
+        The situation, not the solution. What are you trying to achieve, and
+        what gets in the way today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like to happen?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: shape
+    attributes:
+      label: Where do you think it belongs?
+      options:
+        - A new plugin
+        - An existing plugin
+        - The web dashboard
+        - The bot itself
+        - The plugin API
+        - No idea
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Anything you have tried or considered?
+      description: Other bots, other plugins, a workaround you are using now.
