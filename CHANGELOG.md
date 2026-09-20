@@ -17,7 +17,14 @@ much less often than the bot around it.
   people looking in the wrong place. A timeout now says so, and says the work
   may still be in progress.
 - The bot reported itself as connected before it had ever connected, because a
-  client that has not started is not "closed" either. The setup page waited on
+  client that has not started is not "closed" either.
+- `./doppler stop` left plugin sidecars running. They are created by the broker
+  through the Docker API, so they carry no compose project label and `compose
+  down` walked past them; the stale container then held the network open too.
+- A plugin's sidecar could fail to start on a cold boot. The bot asked the
+  broker for it the moment its plugins loaded, which was a fraction of a second
+  before the broker began listening, and the music plugin came up with no
+  Lavalink. The broker has a healthcheck now and the bot waits for it. The setup page waited on
   that flag, so it could move on too soon.
 
 ### Changed

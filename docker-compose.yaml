@@ -28,7 +28,12 @@ services:
       - ./config:/app/config:ro
       - ./plugins:/app/plugins:ro
     depends_on:
-      - broker
+      # service_healthy, not a bare dependency: a bare one waits only for the
+      # container to exist. The bot asks the broker for sidecars the moment its
+      # plugins load, and it was winning that race by a fraction of a second --
+      # the request failed and the music plugin came up with no Lavalink at all.
+      broker:
+        condition: service_healthy
 
   web:
     build: .
@@ -67,6 +72,14 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - DEEPL_API_KEY=${DEEPL_API_KEY:-}
       - GOOGLE_TRANSLATE_API_KEY=${GOOGLE_TRANSLATE_API_KEY:-}
+    healthcheck:
+      # urllib rather than curl: this image has Python and little else.
+      test: ["CMD", "python3", "-c",
+             "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/health', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 3s
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - .:/project:ro
