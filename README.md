@@ -24,9 +24,9 @@ you would call a feature is installed from a source through the dashboard's
 **Plugins → Browse** tab, then enabled, configured and reloaded from **Plugins →
 Installed**. Reloading swaps a plugin's code *without restarting the bot*.
 
-The official plugins live on this repository's
-[`doppler/plugins`](../../tree/doppler/plugins) branch, configured as a trusted
-source out of the box.
+The official plugins live in a separate repository,
+[omka-1337/doppler-plugins](https://github.com/omka-1337/doppler-plugins), configured
+as a trusted source out of the box.
 
 ### The bot
 
@@ -148,8 +148,8 @@ lists them:
   "sources": [
     {
       "name": "doppler-official",
-      "repo": "omka-1337/doppler",
-      "branch": "doppler/plugins",
+      "repo": "omka-1337/doppler-plugins",
+      "branch": "main",
       "trusted": true
     }
   ]

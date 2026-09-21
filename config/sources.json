@@ -3,8 +3,8 @@
     {
       "name": "doppler-official",
       "label": "Doppler official plugins",
-      "repo": "omka-1337/doppler",
-      "branch": "doppler/plugins",
+      "repo": "omka-1337/doppler-plugins",
+      "branch": "main",
       "trusted": true
     }
   ]
