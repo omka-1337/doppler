@@ -14,6 +14,7 @@ that came from an untrusted source.
 import io
 import json
 import logging
+import re
 import shutil
 import tarfile
 import tempfile
@@ -34,6 +35,17 @@ MAX_ARCHIVE_BYTES = 64 * 1024 * 1024
 
 class SourceError(Exception):
     """Raised for an unknown source, a bad catalog, or a failed install."""
+
+
+# Same rule as the bot's manifest check. The id becomes a directory name under
+# /plugins, so anything looser -- "../config" -- would reach outside it.
+_PLUGIN_ID = re.compile(r"^[a-z][a-z0-9_]{1,31}$")
+
+
+def _check_id(plugin_id) -> str:
+    if not isinstance(plugin_id, str) or not _PLUGIN_ID.match(plugin_id):
+        raise SourceError(f"{plugin_id!r} is not a valid plugin id.")
+    return plugin_id
 
 
 def _read_json(path: Path, default):
@@ -100,8 +112,8 @@ def source_of(plugin_id: str) -> str | None:
 
 def _catalog_url(source: dict) -> str:
     # The refs/heads/ form is required rather than cosmetic: a branch name
-    # containing a slash ("doppler/plugins") is otherwise ambiguous with the
-    # file path that follows it.
+    # containing a slash ("feature/x") is otherwise ambiguous with the file
+    # path that follows it.
     return (
         f"https://raw.githubusercontent.com/{source['repo']}/"
         f"refs/heads/{source['branch']}/index.json"
@@ -134,6 +146,37 @@ async def fetch_catalog(source: dict) -> dict:
     return catalog
 
 
+def plugin_path(entry: dict) -> str:
+    """Where a catalog entry's plugin lives inside its source's repository.
+
+    Catalogs group plugins by author (``doppler/plugins/music``), so an entry
+    names its own directory in ``path``. An entry without one is a directory
+    named after its id at the repository root -- the layout every source used
+    before grouping, and still a valid one.
+    """
+    raw = entry.get("path") or entry.get("id") or ""
+    if not isinstance(raw, str) or not raw.strip("/"):
+        raise SourceError(f"Catalog entry {entry.get('id')!r} has no usable path.")
+
+    # The path comes from someone else's repository, so it may only point
+    # down into that repository, never up and out of the archive.
+    if raw.startswith("/") or "\\" in raw:
+        raise SourceError(f"Catalog path {raw!r} must be a relative path.")
+    # Split by hand: PurePosixPath would quietly drop "." and "//", and a
+    # catalog that writes them is better told than second-guessed.
+    parts = raw.strip("/").split("/")
+    if any(part in ("", ".", "..") for part in parts):
+        raise SourceError(f"Catalog path {raw!r} must not contain '.', '..' or empty parts.")
+    return "/".join(parts)
+
+
+def find_entry(catalog: dict, plugin_id: str) -> dict:
+    for entry in catalog.get("plugins", []):
+        if isinstance(entry, dict) and entry.get("id") == plugin_id:
+            return entry
+    raise SourceError(f"The catalog does not offer a plugin {plugin_id!r}.")
+
+
 def _safe_members(tar: tarfile.TarFile, wanted_prefix: str):
     """Yield only regular files under wanted_prefix.
 
@@ -153,11 +196,7 @@ def _safe_members(tar: tarfile.TarFile, wanted_prefix: str):
         yield member
 
 
-async def install(source_name: str, plugin_id: str) -> dict:
-    """Download one plugin from a source and put it in the plugins directory."""
-    source = find_source(source_name)
-    url = _archive_url(source)
-
+async def _download(url: str) -> bytes:
     chunks: list[bytes] = []
     total = 0
     try:
@@ -175,7 +214,20 @@ async def install(source_name: str, plugin_id: str) -> dict:
     except aiohttp.ClientError as e:
         raise SourceError(f"Could not download {url}: {e}") from e
 
-    payload = b"".join(chunks)
+    return b"".join(chunks)
+
+
+async def install(source_name: str, plugin_id: str) -> dict:
+    """Download one plugin from a source and put it in the plugins directory."""
+    _check_id(plugin_id)
+    source = find_source(source_name)
+
+    # Only what the catalog offers can be installed, and the catalog is what
+    # says where in the repository it is.
+    entry = find_entry(await fetch_catalog(source), plugin_id)
+    path = plugin_path(entry)
+
+    payload = await _download(_archive_url(source))
 
     with tarfile.open(fileobj=io.BytesIO(payload), mode="r:gz") as tar:
         names = tar.getnames()
@@ -185,11 +237,11 @@ async def install(source_name: str, plugin_id: str) -> dict:
         # GitHub wraps everything in a single top-level directory whose name
         # depends on the repo and branch, so take it from the archive itself.
         top = names[0].split("/")[0]
-        prefix = f"{top}/{plugin_id}/"
+        prefix = f"{top}/{path}/"
 
         members = list(_safe_members(tar, prefix))
         if not members:
-            raise SourceError(f"{source_name!r} has no plugin {plugin_id!r} at its branch root.")
+            raise SourceError(f"{source_name!r} has no plugin {plugin_id!r} at {path}/.")
 
         with tempfile.TemporaryDirectory() as staging:
             staging_path = Path(staging)
@@ -197,8 +249,20 @@ async def install(source_name: str, plugin_id: str) -> dict:
                 member.name = member.name[len(prefix):]
                 tar.extract(member, staging_path)
 
-            if not (staging_path / "plugin.json").is_file():
+            manifest_file = staging_path / "plugin.json"
+            if not manifest_file.is_file():
                 raise SourceError(f"{plugin_id!r} has no plugin.json.")
+
+            # The directory is installed under the id the catalog gave, and the
+            # loader insists the two agree; refuse here rather than install a
+            # plugin that will never load.
+            try:
+                manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as e:
+                raise SourceError(f"{plugin_id!r} has an unreadable plugin.json: {e}") from e
+            if not isinstance(manifest, dict) or manifest.get("id") != plugin_id:
+                found = manifest.get("id") if isinstance(manifest, dict) else None
+                raise SourceError(f"{path}/plugin.json declares id {found!r}, not {plugin_id!r}.")
 
             target = INSTALLED_ROOT / plugin_id
             INSTALLED_ROOT.mkdir(parents=True, exist_ok=True)
@@ -206,8 +270,6 @@ async def install(source_name: str, plugin_id: str) -> dict:
                 shutil.rmtree(target)
             shutil.copytree(staging_path, target)
             _make_readable(target)
-
-    manifest = json.loads((INSTALLED_ROOT / plugin_id / "plugin.json").read_text(encoding="utf-8"))
 
     installed = load_installed()
     installed[plugin_id] = {"source": source_name, "version": manifest.get("version", "")}
@@ -230,7 +292,7 @@ def _make_readable(path: Path) -> None:
 
 
 def uninstall(plugin_id: str) -> None:
-    target = INSTALLED_ROOT / plugin_id
+    target = INSTALLED_ROOT / _check_id(plugin_id)
     if not target.is_dir():
         raise SourceError(f"{plugin_id!r} is not installed.")
 

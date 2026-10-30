@@ -416,15 +416,16 @@ The broker fixes everything else, and a manifest cannot ask otherwise:
 
 ## Publishing
 
-A source is a GitHub repository and branch with one folder per plugin at the
-root, plus an `index.json` the browser reads. Add it under **Plugins →
-Sources**; it starts untrusted.
+A source is a GitHub repository and branch holding one folder per plugin,
+plus an `index.json` at the root that the browser reads. Add it under
+**Plugins → Sources**; it starts untrusted.
 
 ```
 index.json
-my_plugin/
-    plugin.json
-    plugin.py
+me/plugins/
+    my_plugin/
+        plugin.json
+        plugin.py
 ```
 
 ```json
@@ -433,6 +434,7 @@ my_plugin/
     "plugins": [
         {
             "id": "my_plugin",
+            "path": "me/plugins/my_plugin",
             "name": "My Plugin",
             "version": "1.0.0",
             "description": "...",
@@ -442,6 +444,10 @@ my_plugin/
     ]
 }
 ```
+
+`path` says where the plugin's folder is, and the folder must be named after
+its id. Leave `path` out and the folder is expected at the root, `my_plugin/`.
+Only plugins listed in `index.json` can be installed.
 
 ## What plugins may do
 

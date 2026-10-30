@@ -6,36 +6,6 @@ much less often than the bot around it.
 
 ## Unreleased
 
-### Fixed
-
-- Enabling a plugin twice could crash it. A plugin whose setup waits on the
-  broker takes longer than the dashboard's timeout, so a second click started a
-  second load while the first was still running; both passed the "already
-  loaded?" check and the second died on `add_cog`. Loading, unloading and
-  reloading now take a lock per plugin.
-- A slow answer from the bot was reported as "Bot is not reachable", which sent
-  people looking in the wrong place. A timeout now says so, and says the work
-  may still be in progress.
-- The bot reported itself as connected before it had ever connected, because a
-  client that has not started is not "closed" either.
-- `./doppler stop` left plugin sidecars running. They are created by the broker
-  through the Docker API, so they carry no compose project label and `compose
-  down` walked past them; the stale container then held the network open too.
-- A plugin's sidecar could fail to start on a cold boot. The bot asked the
-  broker for it the moment its plugins loaded, which was a fraction of a second
-  before the broker began listening, and the music plugin came up with no
-  Lavalink. The broker has a healthcheck now and the bot waits for it. The setup page waited on
-  that flag, so it could move on too soon.
-
-### Changed
-
-- On a fresh install the bot waits for first-run setup instead of exiting and
-  being restarted every few seconds. The internal API is already listening by
-  then, so the dashboard can reach it while the token is still being entered,
-  and a slow setup no longer fills the log directory with one file per attempt.
-
-## Unreleased
-
 ### Added
 
 - Plugin API 2.2: `ctx.economy`, a wallet per member shared by every plugin.
@@ -49,6 +19,13 @@ much less often than the bot around it.
   `logs [service]`, `update`.
 - Issue forms for bug reports and feature requests, the bug form asking for the
   diagnostics report.
+- Tests, run by GitHub Actions on every push and pull request: plugin
+  manifests, installing from a source, wallets (including spending from two
+  places at once), and shellcheck on `./doppler`. `pip install -r
+  requirements-dev.txt`, then `pytest`.
+- A catalogue entry may say where its plugin is with `path`, so a source can
+  group plugins by author (`doppler/plugins/music`). Without it the plugin is
+  expected at the root, as before.
 
 ### Fixed
 
@@ -58,16 +35,33 @@ much less often than the bot around it.
   loaded?" check and the second died on `add_cog`. Loading, unloading and
   reloading now take a lock per plugin.
 - A slow answer from the bot was reported as "Bot is not reachable", which sent
-  people looking in the wrong place. A timeout now says so.
+  people looking in the wrong place. A timeout now says so, and says the work
+  may still be in progress.
 - The bot reported itself as connected before it had ever connected, because a
-  client that has not started is not "closed" either.
+  client that has not started is not "closed" either. The setup page waited on
+  that flag, so it could move on too soon.
+- `./doppler stop` left plugin sidecars running. They are created by the broker
+  through the Docker API, so they carry no compose project label and `compose
+  down` walked past them; the stale container then held the network open too.
+- A plugin's sidecar could fail to start on a cold boot. The bot asked the
+  broker for it the moment its plugins loaded, which was a fraction of a second
+  before the broker began listening, and the music plugin came up with no
+  Lavalink. The broker has a healthcheck now and the bot waits for it.
+- The broker's uninstall took a plugin id as a directory name unchecked, so
+  `../config` would have deleted the configuration. Ids are checked now, on
+  install too, and only plugins a source's `index.json` lists can be installed
+  from it.
 
 ### Changed
 
 - On a fresh install the bot waits for first-run setup instead of exiting and
-  being restarted every few seconds.
+  being restarted every few seconds. The internal API is already listening by
+  then, so the dashboard can reach it while the token is still being entered,
+  and a slow setup no longer fills the log directory with one file per attempt.
 - The compose project name is pinned, so renaming the directory no longer
   orphans the running containers.
+- The official plugins moved to their own repository,
+  [omka-1337/doppler-plugins](https://github.com/omka-1337/doppler-plugins).
 
 ## 0.5.0 — 2026-09-11
 

@@ -139,7 +139,7 @@ provider keys are no longer part of what you hand over.
 ### Sources and trust
 
 Plugins are installed from *sources* — a GitHub repository and branch holding
-one directory per plugin plus an `index.json` catalogue. There is exactly one
+one directory per plugin plus an `index.json` catalogue that says where each one is. There is exactly one
 place plugins live, `plugins/`, and only the broker writes it. `config/sources.json`
 lists them:
 

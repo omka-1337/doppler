@@ -1,0 +1,5 @@
+# Everything the test suite imports: the bot, the broker, and pytest itself.
+-r requirements.txt
+-r broker/requirements.txt
+pytest>=8.3
+pytest-asyncio>=0.24
